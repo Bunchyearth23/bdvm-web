@@ -35,6 +35,8 @@ A web feature declares a stable module ID, compatible API range, permissions and
 
 Web is not an economy engine and never decides balances, ownership, prices or contract outcomes. Routes expose read models and accept intents; authoritative feature services validate and execute those intents. This repository ships browser-shell assets but deliberately does not ship an HTTP listener or Unity Mod Manager package.
 
+Concurrent retries sharing one principal, module and idempotency key share exactly one authoritative execution. Envelope tokens reject control characters before logging, and reusing a key with a different payload is refused.
+
 External dependencies: none in the platform assembly. The current browser transport is supplied externally by Remote Dispatch Live through `BDVM.Dispatch`; it is not a dependency of the Web contracts themselves.
 
 ## Build

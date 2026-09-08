@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using BDVM.Common;
 using BDVM.Web;
 
@@ -10,6 +12,7 @@ internal static class Program
     private static int Main()
     {
         Run(TestAuthenticatedIntentAndReplay);
+        Run(TestConcurrentReplayExecutesOnce);
         Run(TestSecurityRefusals);
         Run(TestPayloadAndRateLimits);
         Run(TestShellAndModuleIsolation);
@@ -42,6 +45,21 @@ internal static class Program
         Check(gateway.Submit(csrf, Intent("b", "d")).Code == "unauthorized", "CSRF mismatch must fail");
         var origin = Request(allowed); origin.OriginAuthority = "attacker.invalid";
         Check(gateway.Submit(origin, Intent("c", "e")).Code == "unauthorized" && executor.Calls == 0, "cross-origin request must not reach authority");
+    }
+
+    private static void TestConcurrentReplayExecutesOnce()
+    {
+        var host = Host(); var sessions = new WebSessionRegistry(); var executor = new BlockingExecutor();
+        var session = sessions.Create("player-a", "localhost:8080", new[] { "test.write" });
+        var gateway = new WebIntentGateway(host, sessions, executor); var request = Request(session); var envelope = Intent("parallel", "parallel-c");
+        var first = Task.Run(() => gateway.Submit(request, envelope));
+        executor.Entered.Wait();
+        var second = Task.Run(() => gateway.Submit(request, envelope));
+        executor.Release.Set();
+        Task.WaitAll(first, second);
+        Check(executor.Calls == 1 && first.Result.State == WebIntentState.Succeeded && second.Result.Replayed, "concurrent retries must share one authoritative execution");
+        var invalid = Intent("line-break", "bad\ncorrelation");
+        Check(gateway.Submit(request, invalid).Code == "invalid-envelope", "log tokens must reject control characters");
     }
 
     private static void TestPayloadAndRateLimits()
@@ -95,6 +113,18 @@ internal static class Program
     {
         public int Calls { get; private set; }
         public WebIntentResult Execute(string authenticatedPrincipal, WebIntentEnvelope envelope) { Calls++; return new WebIntentResult { State = WebIntentState.Succeeded, Code = "accepted", CorrelationId = envelope.CorrelationId, ResultJson = "{\"version\":3}" }; }
+    }
+    private sealed class BlockingExecutor : IAuthoritativeWebIntentExecutor
+    {
+        private int calls;
+        public int Calls => calls;
+        public ManualResetEventSlim Entered { get; } = new ManualResetEventSlim(false);
+        public ManualResetEventSlim Release { get; } = new ManualResetEventSlim(false);
+        public WebIntentResult Execute(string authenticatedPrincipal, WebIntentEnvelope envelope)
+        {
+            Interlocked.Increment(ref calls); Entered.Set(); Release.Wait();
+            return new WebIntentResult { State = WebIntentState.Succeeded, Code = "accepted", CorrelationId = envelope.CorrelationId };
+        }
     }
     private sealed class TestModule : IBdvmWebModule
     {

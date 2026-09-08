@@ -1,1 +1,1 @@
-{"id":"BDVM.Web","version":"1.1.0","kind":"platform","dependencies":["BDVM.Common","BDVM.Core"],"webApi":"1.0","authority":"transport-only","assets":["Assets/shell.html","Assets/shell.css","Assets/shell.js"]}
+{"id":"BDVM.Web","version":"1.2.0","kind":"platform","dependencies":["BDVM.Common","BDVM.Core"],"webApi":"1.0","authority":"transport-only","assets":["Assets/shell.html","Assets/shell.css","Assets/shell.js"]}

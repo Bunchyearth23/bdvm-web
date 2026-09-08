@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web.Script.Serialization;
@@ -43,6 +44,7 @@ public sealed class WebIntentGateway
     private readonly SlidingWindowRateLimiter limiter;
     private readonly IAuthoritativeWebIntentExecutor executor;
     private readonly Dictionary<string, ReplayEntry> completed = new Dictionary<string, ReplayEntry>(StringComparer.Ordinal);
+    private readonly Dictionary<string, ExecutionSlot> executing = new Dictionary<string, ExecutionSlot>(StringComparer.Ordinal);
 
     public WebIntentGateway(WebModuleHost modules, WebSessionRegistry sessions, IAuthoritativeWebIntentExecutor executor, SlidingWindowRateLimiter? limiter = null)
     {
@@ -65,6 +67,8 @@ public sealed class WebIntentGateway
         if (validation != null) return validation;
         var replayKey = session.Principal + "|" + envelope.ModuleId + "|" + envelope.IdempotencyKey;
         var fingerprint = Fingerprint(envelope);
+        ExecutionSlot slot;
+        var ownsExecution = false;
         lock (completed)
         {
             if (completed.TryGetValue(replayKey, out var known))
@@ -72,13 +76,31 @@ public sealed class WebIntentGateway
                 if (!string.Equals(known.Fingerprint, fingerprint, StringComparison.Ordinal)) return Refused("idempotency-conflict", envelope.CorrelationId);
                 return Copy(known.Result, true);
             }
+            if (executing.TryGetValue(replayKey, out slot!))
+            {
+                if (!string.Equals(slot.Fingerprint, fingerprint, StringComparison.Ordinal)) return Refused("idempotency-conflict", envelope.CorrelationId);
+            }
+            else
+            {
+                slot = new ExecutionSlot(fingerprint);
+                executing.Add(replayKey, slot);
+                ownsExecution = true;
+            }
+        }
+        if (!ownsExecution)
+        {
+            slot.Completed.Wait();
+            return Copy(slot.Result ?? Refused("authoritative-executor-failed", envelope.CorrelationId), true);
         }
         WebIntentResult result;
         try { result = executor.Execute(session.Principal, envelope) ?? Refused("empty-authoritative-result", envelope.CorrelationId); }
         catch (Exception) { result = new WebIntentResult { State = WebIntentState.Reconcile, Code = "authoritative-executor-failed", CorrelationId = envelope.CorrelationId }; }
-        if (result.State != WebIntentState.Pending)
+        lock (completed)
         {
-            lock (completed) completed[replayKey] = new ReplayEntry(fingerprint, Copy(result, false));
+            executing.Remove(replayKey);
+            slot.Result = Copy(result, false);
+            if (result.State != WebIntentState.Pending) completed[replayKey] = new ReplayEntry(fingerprint, Copy(result, false));
+            slot.Completed.Set();
         }
         return result;
     }
@@ -101,7 +123,7 @@ public sealed class WebIntentGateway
         return null;
     }
 
-    private static bool BoundedToken(string value) => !string.IsNullOrWhiteSpace(value) && value.Length <= MaximumTokenLength;
+    private static bool BoundedToken(string value) => !string.IsNullOrWhiteSpace(value) && value.Length <= MaximumTokenLength && value.All(c => char.IsLetterOrDigit(c) || c == '.' || c == '_' || c == ':' || c == '-');
     private static string Fingerprint(WebIntentEnvelope envelope)
     {
         var canonical = envelope.SchemaVersion + "|" + envelope.ModuleId + "|" + envelope.IntentType + "|" + envelope.ExpectedVersion + "|" + envelope.PayloadJson;
@@ -110,4 +132,11 @@ public sealed class WebIntentGateway
     private static WebIntentResult Refused(string code, string correlation) => new WebIntentResult { State = WebIntentState.Refused, Code = code, CorrelationId = correlation ?? "" };
     private static WebIntentResult Copy(WebIntentResult source, bool replayed) => new WebIntentResult { State = source.State, Code = source.Code, CorrelationId = source.CorrelationId, ResultJson = source.ResultJson, Replayed = replayed };
     private sealed class ReplayEntry { public ReplayEntry(string fingerprint, WebIntentResult result) { Fingerprint = fingerprint; Result = result; } public string Fingerprint { get; } public WebIntentResult Result { get; } }
+    private sealed class ExecutionSlot
+    {
+        public ExecutionSlot(string fingerprint) { Fingerprint = fingerprint; }
+        public string Fingerprint { get; }
+        public System.Threading.ManualResetEventSlim Completed { get; } = new System.Threading.ManualResetEventSlim(false);
+        public WebIntentResult? Result { get; set; }
+    }
 }
