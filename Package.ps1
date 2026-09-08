@@ -7,6 +7,7 @@ dotnet run --project (Join-Path $projectRoot 'tests\BDVM.Web.Tests.csproj') -c R
 node --test (Join-Path $projectRoot 'tests\shell.test.cjs')
 New-Item -ItemType Directory -Force $stage | Out-Null
 Copy-Item -Force (Join-Path $projectRoot 'bin\Release\net48\BDVM.Web.dll'), (Join-Path $projectRoot 'module.json'), (Join-Path $projectRoot 'README.md'), (Join-Path $projectRoot 'LICENSE') $stage
+if (Test-Path (Join-Path $projectRoot 'COMPATIBILITY.md')) { Copy-Item -Force (Join-Path $projectRoot 'COMPATIBILITY.md') $stage }
 Copy-Item -Recurse -Force (Join-Path $projectRoot 'Assets') $stage
 Compress-Archive -Force (Join-Path $stage '*') ("$stage.zip")
 Write-Output ("Packaged {0}" -f "$stage.zip")
