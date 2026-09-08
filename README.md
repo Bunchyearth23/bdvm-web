@@ -58,4 +58,4 @@ The host currently exposes Web API 1.0. Modules state an accepted range and are 
 
 ## License
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) and the applied copyright [NOTICE](NOTICE).
