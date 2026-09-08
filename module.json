@@ -1,0 +1,1 @@
+{"id":"BDVM.Web","version":"1.0.0","kind":"platform","dependencies":["BDVM.Common","BDVM.Core"]}
