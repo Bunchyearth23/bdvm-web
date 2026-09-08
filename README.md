@@ -9,7 +9,7 @@
 | Module kind | Web platform |
 | Target framework | .NET Framework 4.8 (`net48`) |
 | Required modules | `BDVM.Common`, `BDVM.Core` |
-| Standalone web server | Not yet |
+| Standalone web server | Not included; transport adapter required |
 | Current browser transport | Remote Dispatch integration through `BDVM.Dispatch` |
 
 ## Responsibilities
@@ -18,12 +18,14 @@
 - Stage registrations and publish them atomically only after complete validation.
 - Reject incompatible API ranges, duplicate module IDs and collisions in routes, assets or navigation.
 - Validate route namespaces, realtime subscriptions and declared permissions.
+- Issue bounded sessions and enforce CSRF, same-origin, permission, payload, rate-limit, expected-version and idempotency checks before host execution.
+- Serve a responsive shell asset with shared connection state and module-owned navigation.
 - Publish loaded module capabilities through the shared registry.
 - Fail closed when a module throws during registration or requests capabilities outside its manifest.
 
 ## Key surfaces
 
-`WebModuleHost` is the platform entry point. It produces `WebModuleLoadResult` and `LoadedWebModule` records and consumes the contracts defined in `BDVM.Common`, including `BdvmWebModuleManifest`, `IBdvmWebRegistrar` and `IBdvmWebModule`.
+`WebModuleHost` is the module registry. `WebSessionRegistry` and `WebIntentGateway` protect mutating routes before forwarding them to `IAuthoritativeWebIntentExecutor`. `WebShellService` creates the versioned shell snapshot. The [surface inventory](SURFACE_INVENTORY.md) records ownership across Web, Dispatch and Management.
 
 ## Extension model
 
@@ -31,7 +33,7 @@ A web feature declares a stable module ID, compatible API range, permissions and
 
 ## Boundaries
 
-Web is not an economy engine and never decides balances, ownership, prices or contract outcomes. Routes expose read models and accept intents; authoritative feature services validate and execute those intents. This repository also does not yet ship an HTTP listener, browser shell or Unity Mod Manager package by itself.
+Web is not an economy engine and never decides balances, ownership, prices or contract outcomes. Routes expose read models and accept intents; authoritative feature services validate and execute those intents. This repository ships browser-shell assets but deliberately does not ship an HTTP listener or Unity Mod Manager package.
 
 External dependencies: none in the platform assembly. The current browser transport is supplied externally by Remote Dispatch Live through `BDVM.Dispatch`; it is not a dependency of the Web contracts themselves.
 
@@ -41,11 +43,14 @@ Keep Common and Core as sibling repositories under `src/`, then run:
 
 ```powershell
 dotnet build .\BDVM.Web.csproj -c Release
+dotnet run --project .\tests\BDVM.Web.Tests.csproj -c Release
+node --test .\tests\shell.test.cjs
+.\Package.ps1
 ```
 
 ## Testing and installation
 
-Validation tests cover API incompatibility, namespace isolation, duplicate registrations, undeclared permissions and atomic failure. The currently usable browser transport comes from the BDVM Remote Dispatch fork and `BDVM.Dispatch`; install the matching `BDVM.Full` composition rather than this DLL alone.
+Backend tests cover authentication, permissions, CSRF, same-origin, replay, idempotency conflicts, payload/rate bounds and module failure isolation. Frontend tests verify inert rendering of untrusted labels. `Package.ps1` produces a versioned Web archive without bundling Dispatch or Management.
 
 ## Compatibility
 

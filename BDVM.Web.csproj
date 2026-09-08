@@ -7,7 +7,10 @@
     <RootNamespace>BDVM.Web</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="tests\**\*.cs" />
+    <Reference Include="System.Web.Extensions" />
     <ProjectReference Include="..\BDVM.Common\BDVM.Common.csproj" />
     <ProjectReference Include="..\BDVM.Core\BDVM.Core.csproj" />
+    <Content Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
