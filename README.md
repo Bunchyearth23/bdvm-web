@@ -33,6 +33,8 @@ A web feature declares a stable module ID, compatible API range, permissions and
 
 Web is not an economy engine and never decides balances, ownership, prices or contract outcomes. Routes expose read models and accept intents; authoritative feature services validate and execute those intents. This repository also does not yet ship an HTTP listener, browser shell or Unity Mod Manager package by itself.
 
+External dependencies: none in the platform assembly. The current browser transport is supplied externally by Remote Dispatch Live through `BDVM.Dispatch`; it is not a dependency of the Web contracts themselves.
+
 ## Build
 
 Keep Common and Core as sibling repositories under `src/`, then run:
