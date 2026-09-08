@@ -14,6 +14,7 @@ internal static class Program
         Run(TestPayloadAndRateLimits);
         Run(TestShellAndModuleIsolation);
         Run(TestNamespaceAndCapabilityCollisions);
+        Run(TestRouteCollisionAndApiVersionRefusal);
         Console.WriteLine("BDVM.Web tests: " + (checks - failures) + "/" + checks + " passed");
         return failures == 0 ? 0 : 1;
     }
@@ -75,6 +76,15 @@ internal static class Program
         Check(new WebModuleHost().Load(traversal).Code == "route-outside-namespace", "route traversal must fail before publication");
     }
 
+    private static void TestRouteCollisionAndApiVersionRefusal()
+    {
+        var observed = ""; var host = new WebModuleHost(); host.LoadObserved += result => observed = result.Code;
+        var collision = host.Load(new DuplicateRoutesModule());
+        Check(collision.Code == "route-collision" && observed == "route-collision" && host.Modules.Count == 0, "route collision must be atomic and observable");
+        var incompatible = host.Load(new FutureModule());
+        Check(incompatible.Code == "incompatible-web-api" && host.Modules.Count == 0, "incompatible Web API must disable only that module");
+    }
+
     private static WebModuleHost Host() { var host = new WebModuleHost(); Check(host.Load(new TestModule()).State == WebModuleLoadState.Loaded, "test module should load"); return host; }
     private static WebSessionRequest Request(WebSession session) => new WebSessionRequest { SessionId = session.SessionId, CsrfToken = session.CsrfToken, OriginAuthority = session.OriginAuthority };
     private static WebIntentEnvelope Intent(string key, string correlation) => new WebIntentEnvelope { ModuleId = "BDVM.Test", IntentType = "bdvm.test.write.v1", IdempotencyKey = key, CorrelationId = correlation, ExpectedVersion = 2, PayloadJson = "{}" };
@@ -105,5 +115,15 @@ internal static class Program
     {
         public BdvmWebModuleManifest Manifest { get; } = new BdvmWebModuleManifest { Id = "BDVM.Traversal", DisplayName = "Traversal", ModuleVersion = "1.0.0", RequiredWebApi = new BdvmApiRange(new BdvmApiVersion(1, 0), new BdvmApiVersion(1, 0)), RouteNamespace = "/api/modules/bdvm.traversal", AssetNamespace = "modules/bdvm.traversal" };
         public void Register(IBdvmWebRegistrar registrar) => registrar.AddRoute(new BdvmWebRoute { Method = "GET", Path = "/api/modules/bdvm.traversal/../secret" });
+    }
+    private sealed class DuplicateRoutesModule : IBdvmWebModule
+    {
+        public BdvmWebModuleManifest Manifest { get; } = new BdvmWebModuleManifest { Id = "BDVM.Duplicate", DisplayName = "Duplicate", ModuleVersion = "1.0.0", RequiredWebApi = new BdvmApiRange(new BdvmApiVersion(1, 0), new BdvmApiVersion(1, 0)), RouteNamespace = "/api/modules/bdvm.duplicate", AssetNamespace = "modules/bdvm.duplicate" };
+        public void Register(IBdvmWebRegistrar registrar) { registrar.AddRoute(new BdvmWebRoute { Method = "GET", Path = "/api/modules/bdvm.duplicate/state" }); registrar.AddRoute(new BdvmWebRoute { Method = "get", Path = "/api/modules/bdvm.duplicate/STATE" }); }
+    }
+    private sealed class FutureModule : IBdvmWebModule
+    {
+        public BdvmWebModuleManifest Manifest { get; } = new BdvmWebModuleManifest { Id = "BDVM.Future", DisplayName = "Future", ModuleVersion = "2.0.0", RequiredWebApi = new BdvmApiRange(new BdvmApiVersion(2, 0), new BdvmApiVersion(2, 0)), RouteNamespace = "/api/modules/bdvm.future", AssetNamespace = "modules/bdvm.future" };
+        public void Register(IBdvmWebRegistrar registrar) { }
     }
 }
