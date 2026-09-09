@@ -9,8 +9,8 @@
 | Module kind | Web platform |
 | Target framework | .NET Framework 4.8 (`net48`) |
 | Required modules | `BDVM.Common`, `BDVM.Core` |
-| Standalone web server | Not included; transport adapter required |
-| Current browser transport | Remote Dispatch integration through `BDVM.Dispatch` |
+| Standalone business authority | Never; all business state remains host-authoritative |
+| Transport | Abstract `IBdvmWebTransport`; no mandatory Remote Dispatch dependency |
 
 ## Responsibilities
 
@@ -19,13 +19,15 @@
 - Reject incompatible API ranges, duplicate module IDs and collisions in routes, assets or navigation.
 - Validate route namespaces, realtime subscriptions and declared permissions.
 - Issue bounded sessions and enforce CSRF, same-origin, permission, payload, rate-limit, expected-version and idempotency checks before host execution.
+- Authenticate accounts using per-account random salts and PBKDF2-SHA256 password hashes; plaintext passwords are never stored.
+- Keep the immutable technical principal separate from the display name, preferring the Multiplayer name when supplied.
 - Serve a responsive shell asset with shared connection state and module-owned navigation.
 - Publish loaded module capabilities through the shared registry.
 - Fail closed when a module throws during registration or requests capabilities outside its manifest.
 
 ## Key surfaces
 
-`WebModuleHost` is the module registry. `WebSessionRegistry` and `WebIntentGateway` protect mutating routes before forwarding them to `IAuthoritativeWebIntentExecutor`. `WebShellService` creates the versioned shell snapshot. The [surface inventory](SURFACE_INVENTORY.md) records ownership across Web, Dispatch and Management.
+`WebModuleHost` is the module registry. `WebAuthenticationService`, `WebSessionRegistry` and `WebIntentGateway` protect access before forwarding mutations to `IAuthoritativeWebIntentExecutor`. `IBdvmWebTransport` isolates HTTP/WebSocket mechanics from Web and domain code. `WebShellService` creates the versioned shell snapshot. The [surface inventory](SURFACE_INVENTORY.md) records ownership across Web, Dispatch and Management.
 
 ## Extension model
 
@@ -33,11 +35,22 @@ A web feature declares a stable module ID, compatible API range, permissions and
 
 ## Boundaries
 
-Web is not an economy engine and never decides balances, ownership, prices or contract outcomes. Routes expose read models and accept intents; authoritative feature services validate and execute those intents. This repository ships browser-shell assets but deliberately does not ship an HTTP listener or Unity Mod Manager package.
+Web is not an economy engine and never decides balances, ownership, prices or contract outcomes. Routes expose read models and accept intents; authoritative feature services validate and execute those intents. This repository ships browser-shell assets and a transport contract but deliberately does not bind a network listener or Unity runtime yet.
+
+Dispatch and Management are distinct feature modules and user interfaces. They share only the Web shell, authentication and session transport.
+
+## Authentication and identity
+
+- Account names are normalized; passwords contain 10–256 characters.
+- Only a random salt, PBKDF2-SHA256 hash and iteration count are persisted by an `IWebCredentialStore` implementation.
+- Login attempts are rate-limited by remote address. Sessions are bounded, same-origin, CSRF-protected, permission-scoped and revocable.
+- `PrincipalId` is the stable economic/security identity and never changes with the player's name.
+- `DisplayName` is presentation-only. The host should use the Multiplayer name when available; otherwise the player chooses it.
+- Production composition must provide a durable protected credential store. `InMemoryWebCredentialStore` is for tests and ephemeral local sessions only.
 
 Concurrent retries sharing one principal, module and idempotency key share exactly one authoritative execution. Envelope tokens reject control characters before logging, and reusing a key with a different payload is refused.
 
-External dependencies: none in the platform assembly. The current browser transport is supplied externally by Remote Dispatch Live through `BDVM.Dispatch`; it is not a dependency of the Web contracts themselves.
+External dependencies: none in the platform assembly. A runtime may provide a native BDVM listener or an optional Remote Dispatch adapter.
 
 ## Build
 
@@ -52,7 +65,7 @@ node --test .\tests\shell.test.cjs
 
 ## Testing and installation
 
-Backend tests cover authentication, permissions, CSRF, same-origin, replay, idempotency conflicts, payload/rate bounds and module failure isolation. Frontend tests verify inert rendering of untrusted labels. `Package.ps1` produces a versioned Web archive without bundling Dispatch or Management.
+Backend tests cover salted password authentication, technical/display identity separation, permissions, CSRF, same-origin, replay, idempotency conflicts, payload/rate bounds and module failure isolation. Frontend tests verify inert rendering of untrusted labels and identity.
 
 ## Compatibility
 

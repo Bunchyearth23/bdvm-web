@@ -18,8 +18,22 @@ internal static class Program
         Run(TestShellAndModuleIsolation);
         Run(TestNamespaceAndCapabilityCollisions);
         Run(TestRouteCollisionAndApiVersionRefusal);
+        Run(TestPasswordAuthenticationAndDisplayName);
         Console.WriteLine("BDVM.Web tests: " + (checks - failures) + "/" + checks + " passed");
         return failures == 0 ? 0 : 1;
+    }
+
+    private static void TestPasswordAuthenticationAndDisplayName()
+    {
+        var store = new InMemoryWebCredentialStore(); var sessions = new WebSessionRegistry();
+        var auth = new WebAuthenticationService(store, sessions, new SlidingWindowRateLimiter(3));
+        var record = auth.Register("Engineer.One", "a-long-safe-password", new WebIdentity { PrincipalId = "player:stable-42", DisplayName = "Fallback", MultiplayerDisplayName = "Rail Fox" }, new[] { "management.read" });
+        Check(record.PasswordHash != "a-long-safe-password" && record.Salt.Length > 20 && record.Iterations >= 100000, "password must be salted and strongly derived");
+        Check(record.PrincipalId == "player:stable-42" && record.DisplayName == "Rail Fox", "multiplayer name is display-only and stable principal remains separate");
+        var session = auth.Login(new WebLoginRequest { AccountName = "ENGINEER.ONE", Password = "a-long-safe-password", OriginAuthority = "localhost:8080", RemoteAddress = "127.0.0.1" });
+        Check(session.Principal == "player:stable-42" && session.DisplayName == "Rail Fox", "login must bind session to technical identity and display name");
+        var refused = false; try { auth.Login(new WebLoginRequest { AccountName = "engineer.one", Password = "wrong-password", OriginAuthority = "localhost:8080", RemoteAddress = "127.0.0.2" }); } catch (UnauthorizedAccessException) { refused = true; }
+        Check(refused, "wrong password must be refused without revealing account details");
     }
 
     private static void TestAuthenticatedIntentAndReplay()

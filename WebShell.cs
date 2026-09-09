@@ -12,6 +12,8 @@ public sealed class WebShellSnapshot
     public string WebApiVersion { get; set; } = WebModuleHost.CurrentApi.ToString();
     public WebConnectionState ConnectionState { get; set; }
     public string CorrelationId { get; set; } = "";
+    public string PrincipalId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
     public IReadOnlyList<WebShellModule> Modules { get; set; } = Array.Empty<WebShellModule>();
     public IReadOnlyList<WebShellNavigation> Navigation { get; set; } = Array.Empty<WebShellNavigation>();
 }
