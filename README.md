@@ -25,6 +25,12 @@
 - Publish loaded module capabilities through the shared registry.
 - Fail closed when a module throws during registration or requests capabilities outside its manifest.
 
+## Svelte interface
+
+The browser shell is a compiled Svelte 5 application with a shared amber-orange and anthracite design system. It is responsive from handheld screens to dispatch-room displays, supports reduced-motion preferences, and keeps Dispatch and Management as distinct workspaces. The generated `Assets/shell.js` and `Assets/shell.css` are self-contained, so the game host does not require Node.js.
+
+Frontend source lives in `frontend/`. Rebuild the static runtime assets with `npm ci`, `npm run check`, and `npm run build`; do not edit the generated shell bundle directly.
+
 ## Key surfaces
 
 `WebModuleHost` is the module registry. `WebAuthenticationService`, `WebSessionRegistry` and `WebIntentGateway` protect access before forwarding mutations to `IAuthoritativeWebIntentExecutor`. `IBdvmWebTransport` isolates HTTP/WebSocket mechanics from Web and domain code. `WebShellService` creates the versioned shell snapshot. The [surface inventory](SURFACE_INVENTORY.md) records ownership across Web, Dispatch and Management.
@@ -57,6 +63,9 @@ External dependencies: none in the platform assembly. A runtime may provide a na
 Keep Common and Core as sibling repositories under `src/`, then run:
 
 ```powershell
+npm ci
+npm run check
+npm run build
 dotnet build .\BDVM.Web.csproj -c Release
 dotnet run --project .\tests\BDVM.Web.Tests.csproj -c Release
 node --test .\tests\shell.test.cjs

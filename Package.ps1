@@ -2,6 +2,9 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
 $manifest = Get-Content -Raw (Join-Path $projectRoot 'module.json') | ConvertFrom-Json
 $stage = Join-Path $projectRoot ("artifacts\BDVM.Web-{0}" -f $manifest.version)
+npm --prefix $projectRoot ci
+npm --prefix $projectRoot run check
+npm --prefix $projectRoot run build
 dotnet build (Join-Path $projectRoot 'BDVM.Web.csproj') -c Release
 dotnet run --project (Join-Path $projectRoot 'tests\BDVM.Web.Tests.csproj') -c Release
 node --test (Join-Path $projectRoot 'tests\shell.test.cjs')
