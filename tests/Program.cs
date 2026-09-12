@@ -85,6 +85,12 @@ internal static class Program
         Check(gateway.Submit(Request(session), oversized).Code == "payload-too-large", "oversized payload must fail before authority");
         var malformed = Intent("malformed", "malformed-c"); malformed.PayloadJson = "not-json";
         Check(new WebIntentGateway(host, sessions, executor).Submit(Request(session), malformed).Code == "invalid-payload", "malformed JSON object must fail before authority");
+        foreach (var json in new[] { "[]", "null", "{} {}", "{\"a\":" + new string('[', 20) + "0" + new string(']', 20) + "}" })
+        {
+            var invalid = Intent("invalid-json", "invalid-json-c"); invalid.PayloadJson = json;
+            Check(new WebIntentGateway(host, sessions, executor).Submit(Request(session), invalid).Code == "invalid-payload", "only a bounded single JSON object may reach authority");
+        }
+        Check(!typeof(WebIntentGateway).Assembly.GetReferencedAssemblies().Any(value => value.Name == "System.Web.Extensions"), "Unity gateway must not require the unavailable desktop web assembly");
         var second = new WebIntentGateway(host, sessions, executor, new SlidingWindowRateLimiter(1));
         Check(second.Submit(Request(session), Intent("one", "one-c")).State == WebIntentState.Succeeded, "first bounded request should pass");
         Check(second.Submit(Request(session), Intent("two", "two-c")).Code == "rate-limited", "rate limit should refuse burst");

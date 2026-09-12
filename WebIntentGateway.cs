@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Web.Script.Serialization;
+using System.IO;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using BDVM.Common;
 
 namespace BDVM.Web;
@@ -115,9 +117,12 @@ public sealed class WebIntentGateway
             return Refused("payload-too-large", envelope.CorrelationId);
         try
         {
-            var serializer = new JavaScriptSerializer { MaxJsonLength = MaximumPayloadBytes, RecursionLimit = 16 };
-            if (!(serializer.DeserializeObject(envelope.PayloadJson) is IDictionary<string, object>)) return Refused("invalid-payload", envelope.CorrelationId);
+            using (var reader = new JsonTextReader(new StringReader(envelope.PayloadJson)) { MaxDepth = 16, DateParseHandling = DateParseHandling.None })
+            {
+                if (!(JToken.ReadFrom(reader) is JObject) || reader.Read()) return Refused("invalid-payload", envelope.CorrelationId);
+            }
         }
+        catch (JsonException) { return Refused("invalid-payload", envelope.CorrelationId); }
         catch (ArgumentException) { return Refused("invalid-payload", envelope.CorrelationId); }
         catch (InvalidOperationException) { return Refused("invalid-payload", envelope.CorrelationId); }
         return null;

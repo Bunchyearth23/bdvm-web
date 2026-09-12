@@ -5,10 +5,11 @@
     <Nullable>enable</Nullable>
     <AssemblyName>BDVM.Web</AssemblyName>
     <RootNamespace>BDVM.Web</RootNamespace>
+    <GameDir Condition="'$(GameDir)' == ''">D:\Steam\steamapps\common\Derail Valley</GameDir>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="tests\**\*.cs" />
-    <Reference Include="System.Web.Extensions" />
+    <Reference Include="Newtonsoft.Json" HintPath="$(GameDir)\DerailValley_Data\Managed\Newtonsoft.Json.dll" />
     <ProjectReference Include="..\BDVM.Common\BDVM.Common.csproj" />
     <ProjectReference Include="..\BDVM.Core\BDVM.Core.csproj" />
     <Content Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />

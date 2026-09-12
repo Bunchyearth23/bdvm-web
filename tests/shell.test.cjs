@@ -18,8 +18,10 @@ test('Svelte shell compiles as self-contained static assets', () => {
   assert.doesNotMatch(html, /node_modules|frontend\//);
   assert.match(html, /\/bdvm-ui\/bootstrap\.js/);
   assert.match(html, /\/bdvm-ui\/modules\/bdvm\.management\/app\.js/);
+  assert.match(html, /\/bdvm-ui\/modules\/bdvm\.dispatch\/app\.js/);
   assert.match(bootstrap, /\/api\/modules\/bdvm\.management\/snapshot/);
   assert.match(bootstrap, /\/api\/modules\/bdvm\.management\/intent/);
+  assert.match(bootstrap, /\/api\/modules\/bdvm\.dispatch\/snapshot/);
   assert.match(component, /normalizeKeys/);
   assert.match(bootstrap, /normalizeKeys/);
 });
@@ -48,8 +50,9 @@ test('module labels remain escaped by Svelte and module ownership is forwarded',
 
 test('Dispatch and Management remain distinct destinations', () => {
   assert.match(component, /ownerModuleId/);
-  assert.match(bootstrap, /path==='\/dispatch'/);
-  assert.match(bootstrap, /path!=='\/management'/);
+  assert.match(bootstrap, /frame\.src='\/legacy-dispatch'/);
+  assert.match(bootstrap, /bdvm-dispatch-frame/);
+  assert.match(bootstrap, /BdvmManagement\.create/);
 });
 
 test('browser-facing shell sources remain English-only', () => {

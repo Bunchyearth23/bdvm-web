@@ -58,7 +58,7 @@
     <button class="menu-button" type="button" aria-label="Toggle navigation" aria-expanded={menuOpen} onclick={() => menuOpen = !menuOpen}>☰</button>
     <a class="brand" href="/" onclick={(event) => { event.preventDefault(); navigate({ path: '/', ownerModuleId: 'BDVM.Web' }); }}>
       <span class="brand-mark">B</span>
-      <span><strong>BDVM</strong><small>Rail operations suite</small></span>
+      <span><strong>BDVM Operations</strong><small>Live railway control</small></span>
     </a>
     <div class="session">
       <span class="session-name" title={snapshot.principalId ? 'Authenticated account' : 'No authenticated session'}>{snapshot.displayName || 'Signed out'}</span>
@@ -68,7 +68,7 @@
 
   <div class="workspace">
     <aside class:open={menuOpen}>
-      <div class="nav-heading">Workspace</div>
+      <div class="nav-heading">Operations</div>
       <nav aria-label="Modules">
         {#each snapshot.navigation || [] as item (item.path)}
           <button type="button" class:active={activePath === item.path} data-module={item.ownerModuleId} onclick={() => navigate(item)}>
@@ -76,7 +76,7 @@
           </button>
         {/each}
       </nav>
-      <div class="sidebar-footer"><span>Host authoritative</span><small>Snapshots and validated intents</small></div>
+      <div class="sidebar-footer"><span>Live host data</span><small>Commands are validated before execution</small></div>
     </aside>
 
     <main id="module-space">
@@ -115,7 +115,7 @@
   .connection[data-state="Online"] { color:var(--success); }
   .connection[data-state="Offline"] { color:var(--danger); }
   .connection[data-state="Loading"] { color:var(--amber-400); }
-  .workspace { display:grid; grid-template-columns:14.5rem minmax(0,1fr); min-height:calc(100vh - 3.75rem); }
+  .workspace { display:grid; grid-template-columns:13rem minmax(0,1fr); min-height:calc(100vh - 3.75rem); }
   aside { display:flex; flex-direction:column; padding:1.15rem .75rem .75rem; border-right:1px solid var(--line); background:var(--coal-900); }
   .nav-heading { margin:0 .75rem .7rem; color:#817565; font-size:.68rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
   nav { display:grid; gap:.3rem; }
@@ -126,7 +126,7 @@
   nav button.active .nav-indicator { background:var(--amber-400); }
   .sidebar-footer { display:grid; gap:.25rem; margin-top:auto; padding:1rem .75rem .25rem; border-top:1px solid var(--line); color:var(--amber-400); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
   .sidebar-footer small { color:#817565; font-size:.62rem; font-weight:600; }
-  main { width:100%; max-width:112rem; min-width:0; margin:auto; padding:clamp(1rem,2vw,2rem); }
+  main { width:100%; max-width:112rem; min-width:0; margin:auto; padding:clamp(.75rem,1.5vw,1.5rem); }
   .notice { margin-bottom:1rem; padding:.75rem .9rem; border:1px solid var(--line); border-radius:.2rem; background:var(--coal-850); }
   .notice.error { border-color:#743b35; color:#ffaaa4; }
   .empty-state { max-width:42rem; margin:clamp(1rem,5vw,4rem) 0; padding:1.25rem; border-left:3px solid var(--amber-500); background:var(--coal-850); }
@@ -137,6 +137,8 @@
   :global(.bdvm-management button:hover), :global(.bdvm-dispatch button:hover) { border-color:var(--amber-500); color:var(--amber-300); }
   :global(.bdvm-management__tabs button[aria-selected="true"]) { background:var(--amber-500); color:var(--coal-950); font-weight:800; }
   :global(.bdvm-management input), :global(.bdvm-management select) { border-color:var(--line)!important; background:var(--coal-950)!important; color:var(--cream)!important; }
+  :global(.bdvm-dispatch-host) { height:calc(100vh - 6.75rem); min-height:34rem; }
+  :global(.bdvm-dispatch-frame) { width:100%; height:100%; border:1px solid var(--line); background:var(--coal-950); }
   @media (max-width:760px) {
     .topbar { height:3.75rem; padding:0 .75rem; }
     .menu-button { display:block; }

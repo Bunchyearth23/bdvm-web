@@ -1,4 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net48</TargetFramework><LangVersion>latest</LangVersion><Nullable>enable</Nullable></PropertyGroup>
-  <ItemGroup><ProjectReference Include="..\BDVM.Web.csproj" /><ProjectReference Include="..\..\BDVM.Common\BDVM.Common.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="..\BDVM.Web.csproj" /><ProjectReference Include="..\..\BDVM.Common\BDVM.Common.csproj" /><PackageReference Include="Newtonsoft.Json" Version="13.0.3" /></ItemGroup>
 </Project>
