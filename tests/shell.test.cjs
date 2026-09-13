@@ -12,6 +12,7 @@ const bundle = fs.readFileSync(path.join(root, 'Assets', 'shell.js'), 'utf8');
 const bootstrap = fs.readFileSync(path.join(root, 'Assets', 'bootstrap.js'), 'utf8');
 
 test('Svelte shell compiles as self-contained static assets', () => {
+  assert.equal(fs.existsSync(path.join(root, 'index.html')), false);
   assert.match(entry, /mount\(App/);
   assert.match(html, /id="bdvm-app"/);
   assert.ok(bundle.length > 10000);
@@ -20,6 +21,7 @@ test('Svelte shell compiles as self-contained static assets', () => {
   assert.match(html, /\/bdvm-ui\/modules\/bdvm\.management\/app\.js/);
   assert.match(html, /\/bdvm-ui\/modules\/bdvm\.dispatch\/app\.js/);
   assert.match(bootstrap, /\/api\/modules\/bdvm\.management\/snapshot/);
+  assert.match(bootstrap, /updates-ws/);
   assert.match(bootstrap, /\/api\/modules\/bdvm\.management\/intent/);
   assert.match(bootstrap, /\/api\/modules\/bdvm\.dispatch\/snapshot/);
   assert.match(component, /normalizeKeys/);

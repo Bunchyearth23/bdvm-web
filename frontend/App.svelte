@@ -8,6 +8,7 @@
   let activePath = location.pathname;
   let menuOpen = false;
   let error = '';
+  let activityStatus = { state: '', message: '' };
 
   /** Accept the original PascalCase wire shape while the host migrates to camelCase.
    * @param {unknown} value
@@ -42,11 +43,25 @@
     history.pushState({}, '', item.path);
     activePath = item.path;
     menuOpen = false;
+    activityStatus = { state: '', message: '' };
     window.dispatchEvent(new CustomEvent('bdvm:navigate', { detail: { path: item.path, moduleId: item.ownerModuleId } }));
   }
 
   function onPopState() { activePath = location.pathname; }
-  onMount(() => { window.addEventListener('popstate', onPopState); load(); return () => window.removeEventListener('popstate', onPopState); });
+  /** @param {Event} event */
+  function onActivityStatus(event) {
+    const detail = /** @type {CustomEvent<{state?:string,message?:string}>} */ (event).detail || {};
+    activityStatus = { state: String(detail.state || ''), message: String(detail.message || '') };
+  }
+  onMount(() => {
+    window.addEventListener('popstate', onPopState);
+    window.addEventListener('bdvm:status', onActivityStatus);
+    load();
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('bdvm:status', onActivityStatus);
+    };
+  });
 </script>
 
 <svelte:head>
@@ -56,13 +71,17 @@
 <div class="app-shell">
   <header class="topbar">
     <button class="menu-button" type="button" aria-label="Toggle navigation" aria-expanded={menuOpen} onclick={() => menuOpen = !menuOpen}>☰</button>
-    <a class="brand" href="/" onclick={(event) => { event.preventDefault(); navigate({ path: '/', ownerModuleId: 'BDVM.Web' }); }}>
-      <span class="brand-mark">B</span>
-      <span><strong>BDVM Operations</strong><small>Live railway control</small></span>
-    </a>
+    <div class="topbar-title">
+      <a class="brand" href="/" onclick={(event) => { event.preventDefault(); navigate({ path: '/', ownerModuleId: 'BDVM.Web' }); }}>
+        <span><strong>BDVM Operations</strong><small>Live railway control</small></span>
+      </a>
+      <span class="connection" data-state={snapshot.connectionState || 'Offline'}><i></i>{snapshot.connectionState || 'Offline'}</span>
+      {#if activityStatus.message}
+        <span class="activity-status" data-state={activityStatus.state} role="status" aria-live="polite" title={activityStatus.message}>{activityStatus.message}</span>
+      {/if}
+    </div>
     <div class="session">
       <span class="session-name" title={snapshot.principalId ? 'Authenticated account' : 'No authenticated session'}>{snapshot.displayName || 'Signed out'}</span>
-      <span class="connection" data-state={snapshot.connectionState || 'Offline'}><i></i>{snapshot.connectionState || 'Offline'}</span>
     </div>
   </header>
 
@@ -76,10 +95,9 @@
           </button>
         {/each}
       </nav>
-      <div class="sidebar-footer"><span>Live host data</span><small>Commands are validated before execution</small></div>
     </aside>
 
-    <main id="module-space">
+    <main id="module-space" class:management-page={activePath === '/management'}>
       {#if error}
         <div class="notice error" role="alert">{error}</div>
       {/if}
@@ -102,8 +120,8 @@
   :global(:focus-visible) { outline:2px solid var(--amber-400); outline-offset:3px; }
   .app-shell { min-height:100vh; background:var(--coal-950); }
   .topbar { height:3.75rem; display:flex; align-items:center; gap:1rem; padding:0 1.25rem; position:sticky; top:0; z-index:20; border-bottom:1px solid var(--line); background:var(--coal-900); }
-  .brand { display:flex; align-items:center; gap:.75rem; color:var(--cream); text-decoration:none; letter-spacing:.04em; }
-  .brand-mark { display:grid; place-items:center; width:2.15rem; aspect-ratio:1; border-radius:.2rem; background:var(--amber-500); color:var(--coal-950); font-size:1.15rem; font-weight:900; }
+  .topbar-title { display:flex; align-items:center; gap:1rem; min-width:0; }
+  .brand { display:flex; align-items:center; color:var(--cream); text-decoration:none; letter-spacing:.04em; }
   .brand > span:last-child { display:grid; line-height:1.1; }
   .brand strong { font-size:1rem; }
   .brand small { margin-top:.22rem; color:var(--muted); font-size:.68rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
@@ -115,6 +133,10 @@
   .connection[data-state="Online"] { color:var(--success); }
   .connection[data-state="Offline"] { color:var(--danger); }
   .connection[data-state="Loading"] { color:var(--amber-400); }
+  .activity-status { min-width:0; max-width:min(42vw,44rem); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border:1px solid var(--line); border-radius:.2rem; padding:.4rem .65rem; color:var(--muted); font-size:.72rem; font-weight:700; letter-spacing:.02em; }
+  .activity-status[data-state="Succeeded"] { color:var(--success); }
+  .activity-status[data-state="Loading"], .activity-status[data-state="Pending"] { color:var(--amber-400); }
+  .activity-status[data-state="Refused"], .activity-status[data-state="Conflict"], .activity-status[data-state="Timeout"] { color:var(--danger); }
   .workspace { display:grid; grid-template-columns:13rem minmax(0,1fr); min-height:calc(100vh - 3.75rem); }
   aside { display:flex; flex-direction:column; padding:1.15rem .75rem .75rem; border-right:1px solid var(--line); background:var(--coal-900); }
   .nav-heading { margin:0 .75rem .7rem; color:#817565; font-size:.68rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
@@ -124,15 +146,18 @@
   nav button.active { border-color:#6b5228; background:#2b2418; color:var(--amber-300); }
   .nav-indicator { width:.18rem; height:1.15rem; background:transparent; }
   nav button.active .nav-indicator { background:var(--amber-400); }
-  .sidebar-footer { display:grid; gap:.25rem; margin-top:auto; padding:1rem .75rem .25rem; border-top:1px solid var(--line); color:var(--amber-400); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
-  .sidebar-footer small { color:#817565; font-size:.62rem; font-weight:600; }
   main { width:100%; max-width:112rem; min-width:0; margin:auto; padding:clamp(.75rem,1.5vw,1.5rem); }
+  main.management-page { max-width:none; min-height:calc(100vh - 3.75rem); display:flex; flex-direction:column; }
+  :global(main.management-page > .bdvm-management) { flex:1; min-height:100%; }
   .notice { margin-bottom:1rem; padding:.75rem .9rem; border:1px solid var(--line); border-radius:.2rem; background:var(--coal-850); }
   .notice.error { border-color:#743b35; color:#ffaaa4; }
   .empty-state { max-width:42rem; margin:clamp(1rem,5vw,4rem) 0; padding:1.25rem; border-left:3px solid var(--amber-500); background:var(--coal-850); }
   .empty-state h1 { margin:0 0 .5rem; font-size:1.5rem; letter-spacing:-.02em; }
   .empty-state p { margin:0; color:var(--muted); line-height:1.55; }
   :global(.bdvm-management__panel), :global(.bdvm-dispatch) { border-color:var(--line)!important; background:var(--coal-850)!important; }
+  :global(.bdvm-management) { align-content:start; }
+  :global(.bdvm-management__tabs) { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); grid-template-rows:repeat(2,minmax(3.25rem,auto)); gap:.35rem; overflow:visible; padding-bottom:.5rem; }
+  :global(.bdvm-management__tabs button) { min-width:0; min-height:3.25rem; height:auto; padding:.5rem .35rem; white-space:normal; text-align:center; display:flex; align-items:center; justify-content:center; }
   :global(.bdvm-management button), :global(.bdvm-dispatch button) { border:1px solid var(--line); border-radius:.2rem; background:var(--coal-800); color:var(--cream); }
   :global(.bdvm-management button:hover), :global(.bdvm-dispatch button:hover) { border-color:var(--amber-500); color:var(--amber-300); }
   :global(.bdvm-management__tabs button[aria-selected="true"]) { background:var(--amber-500); color:var(--coal-950); font-weight:800; }
@@ -143,6 +168,8 @@
     .topbar { height:3.75rem; padding:0 .75rem; }
     .menu-button { display:block; }
     .brand small,.session-name { display:none; }
+    .topbar-title { gap:.65rem; }
+    .activity-status { max-width:38vw; }
     .workspace { grid-template-columns:1fr; min-height:calc(100vh - 3.75rem); }
     aside { position:fixed; inset:3.75rem auto 0 0; z-index:15; width:min(17rem,86vw); transform:translateX(-105%); transition:transform .15s ease; }
     aside.open { transform:translateX(0); }
