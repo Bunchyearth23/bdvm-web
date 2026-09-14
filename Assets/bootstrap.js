@@ -23,7 +23,7 @@ function show(path=location.pathname){
   if(managementSocket){managementSocket.close();managementSocket=undefined;}
   const root=space();if(!root)return;
   root.replaceChildren();const mount=document.createElement('div');root.append(mount);
-  if(path==='/dispatch'){const frame=document.createElement('iframe');frame.src='/legacy-dispatch';frame.title='Live railway dispatch';frame.className='bdvm-dispatch-frame';frame.setAttribute('allow','fullscreen');mount.className='bdvm-dispatch-host';mount.append(frame);return}
+  if(path==='/dispatch'){const frame=document.createElement('iframe');frame.src='/legacy-dispatch'+location.search;frame.title='Live railway dispatch';frame.className='bdvm-dispatch-frame';frame.setAttribute('allow','fullscreen');mount.className='bdvm-dispatch-host';mount.append(frame);return}
   if(path==='/management'){management=globalThis.BdvmManagement.create(mount,managementTransport);management.refresh();monitorManagement(management,generation);return}
   const heading=document.createElement('h1'),message=document.createElement('p');heading.textContent='Operations overview';message.textContent='Choose Dispatch or Management from the navigation.';mount.className='empty-state';mount.append(heading,message);
 }

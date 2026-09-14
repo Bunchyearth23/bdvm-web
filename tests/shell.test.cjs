@@ -32,8 +32,10 @@ test('runtime serializes shell and Management contracts as browser camelCase', (
   const runtime = fs.readFileSync(path.join(root, '..', 'BDVM.Full', 'Main.cs'), 'utf8');
   assert.match(runtime, /CamelCasePropertyNamesContractResolver/);
   assert.match(runtime, /SerializeObject\(shell, webJsonSettings\)/);
-  assert.match(runtime, /SerializeObject\(snapshot, webJsonSettings\)/);
-  assert.match(runtime, /SerializeObject\(payload, webJsonSettings\)/);
+  assert.match(runtime, /ConfigureAsyncSnapshots\(BuildDispatchJsonAsync, BuildManagementJsonAsync\)/);
+  assert.match(runtime, /SerializeObject\(captured, webJsonSettings\)/);
+  assert.match(runtime, /ProjectSnapshot\(source, correlation\)/);
+  assert.match(runtime, /DetachedWebSnapshot.Capture\(payload, webJsonSettings\)/);
 });
 
 test('responsive amber and anthracite design system is present', () => {
