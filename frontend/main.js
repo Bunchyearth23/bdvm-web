@@ -7,5 +7,6 @@ const app = mount(App, { target });
 (/** @type {any} */ (window)).BdvmWebShell = Object.freeze({
   /** @param {Parameters<typeof app.render>[0]} snapshot */
   render: snapshot => app.render(snapshot),
+  principal: () => app.principal(),
   load: () => app.load()
 });

@@ -4,9 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./jsconfig.json",
-    "test": "node --test tests/shell.test.cjs"
+    "test": "node --test tests/shell.test.cjs tests/dev-proxy.test.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",

@@ -9,6 +9,10 @@
   let menuOpen = false;
   let error = '';
   let activityStatus = { state: '', message: '' };
+  let loading = false;
+  export function principal() { return snapshot.principalId || ''; }
+  /** @type {Record<string,string>} */
+  const descriptions = { '/dispatch': 'Locate rolling stock, inspect cargo and control routes on the live map.', '/management': 'Manage companies, wallets, rolling stock and industrial deliveries.' };
 
   /** Accept the original PascalCase wire shape while the host migrates to camelCase.
    * @param {unknown} value
@@ -26,21 +30,28 @@
   }
 
   export async function load() {
+    if (loading) return;
+    loading = true;
     error = '';
+    activityStatus = { state: '', message: '' };
     snapshot = { ...snapshot, connectionState: 'Loading' };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetch('/api/web/shell', { cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const response = await fetch('/api/web/shell', { signal: controller.signal, cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(response.status === 401 ? 'Sign in to the game host, then reconnect.' : response.status === 403 ? 'This account does not have access.' : 'The game host is unavailable. Load a world, then reconnect.');
       render(await response.json());
+      window.dispatchEvent(new CustomEvent('bdvm:connected'));
     } catch (reason) {
       render({ connectionState: 'Offline', modules: [], navigation: [] });
+      window.dispatchEvent(new CustomEvent('bdvm:disconnected'));
       error = `Web interface unavailable: ${reason instanceof Error ? reason.message : 'unknown error'}`;
-    }
+    } finally { clearTimeout(timer); loading = false; }
   }
 
   /** @param {NavigationItem} item */
   function navigate(item) {
-    history.pushState({}, '', item.path);
+    const target = new URL(item.path, location.origin);for (const key of ['preview','scenario']) { const value = new URLSearchParams(location.search).get(key); if (value) target.searchParams.set(key, value); }history.pushState({}, '', target);
     activePath = item.path;
     menuOpen = false;
     activityStatus = { state: '', message: '' };
@@ -76,11 +87,12 @@
         <span><strong>BDVM Operations</strong><small>Live railway control</small></span>
       </a>
       <span class="connection" data-state={snapshot.connectionState || 'Offline'}><i></i>{snapshot.connectionState || 'Offline'}</span>
-      {#if activityStatus.message}
+      {#if activityStatus.message && (snapshot.modules || []).length && snapshot.connectionState !== 'Loading'}
         <span class="activity-status" data-state={activityStatus.state} role="status" aria-live="polite" title={activityStatus.message}>{activityStatus.message}</span>
       {/if}
     </div>
     <div class="session">
+      <button class="reconnect" type="button" disabled={loading} onclick={load}>{loading ? 'Connecting…' : 'Reconnect'}</button>
       <span class="session-name" title={snapshot.principalId ? 'Authenticated account' : 'No authenticated session'}>{snapshot.displayName || 'Signed out'}</span>
     </div>
   </header>
@@ -90,23 +102,37 @@
       <div class="nav-heading">Operations</div>
       <nav aria-label="Modules">
         {#each snapshot.navigation || [] as item (item.path)}
-          <button type="button" class:active={activePath === item.path} data-module={item.ownerModuleId} onclick={() => navigate(item)}>
+          <button type="button" class:active={activePath === item.path} aria-current={activePath === item.path ? 'page' : undefined} data-module={item.ownerModuleId} onclick={() => navigate(item)}>
             <span class="nav-indicator"></span><span>{item.label}</span>
           </button>
         {/each}
       </nav>
     </aside>
+    {#if menuOpen}<button class="nav-backdrop" aria-label="Close navigation" onclick={() => menuOpen = false}></button>{/if}
 
     <main id="module-space" class:management-page={activePath === '/management'}>
       {#if error}
         <div class="notice error" role="alert">{error}</div>
       {/if}
-      {#if !(snapshot.modules || []).length}
+      {#if activePath === '/' && (snapshot.modules || []).length}
+        <section class="overview">
+          <p class="eyebrow">Your railway workspace</p>
+          <h1>Operations overview</h1>
+          <p>Choose a workspace. Changes are checked by the game host.</p>
+          <div class="overview-links">
+            {#each snapshot.navigation || [] as item (item.path)}
+              <button onclick={() => navigate(item)}><strong>{item.label}</strong><span>{descriptions[item.path] || 'Open this workspace.'}</span><small>Open workspace →</small></button>
+            {/each}
+          </div>
+        </section>
+      {:else if !(snapshot.modules || []).length}
         <section class="empty-state">
           <h1>BDVM Control Center</h1>
           <p>Connect to the authoritative host to access Dispatch and Management.</p>
+          <p>Open Derail Valley and load your career, then use Reconnect.</p>
         </section>
       {/if}
+      <div id="module-content" hidden={activePath === '/' || !(snapshot.modules || []).length}></div>
     </main>
   </div>
 </div>
@@ -128,6 +154,19 @@
   .menu-button { display:none; border:1px solid var(--line); border-radius:.2rem; background:var(--coal-800); color:var(--amber-300); width:2.35rem; height:2.35rem; }
   .session { margin-left:auto; display:flex; align-items:center; gap:1rem; }
   .session-name { color:var(--muted); font-size:.85rem; }
+  .reconnect { padding:.45rem .65rem; border:1px solid var(--line); background:var(--coal-800); color:var(--cream); cursor:pointer; }
+  .reconnect:disabled { opacity:.5; cursor:wait; }
+  .nav-backdrop { display:none; }
+  .overview { padding:clamp(1rem,4vw,4rem); }
+  .overview h1 { font-size:clamp(1.8rem,4vw,3rem); margin:.5rem 0; }
+  .overview > p { color:var(--muted); line-height:1.6; }
+  .eyebrow { text-transform:uppercase; letter-spacing:.15em; font-size:.75rem; }
+  .overview-links { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr)); gap:1rem; margin-top:2rem; }
+  .overview-links button { display:grid; gap:1rem; padding:1.5rem; text-align:left; border:1px solid var(--line); background:var(--coal-850); color:var(--cream); cursor:pointer; }
+  .overview-links button:hover { border-color:var(--amber-500); }
+  .overview-links strong { font-size:1.4rem; }
+  .overview-links span { color:var(--muted); line-height:1.5; }
+  .overview-links small { color:var(--amber-300); }
   .connection { display:flex; align-items:center; gap:.45rem; border:1px solid var(--line); border-radius:.2rem; padding:.4rem .65rem; color:var(--muted); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
   .connection i { width:.42rem; height:.42rem; background:currentColor; }
   .connection[data-state="Online"] { color:var(--success); }
@@ -156,7 +195,7 @@
   .empty-state p { margin:0; color:var(--muted); line-height:1.55; }
   :global(.bdvm-management__panel), :global(.bdvm-dispatch) { border-color:var(--line)!important; background:var(--coal-850)!important; }
   :global(.bdvm-management) { align-content:start; }
-  :global(.bdvm-management__tabs) { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); grid-template-rows:repeat(2,minmax(3.25rem,auto)); gap:.35rem; overflow:visible; padding-bottom:.5rem; }
+  :global(.bdvm-management__tabs) { display:flex; flex-wrap:wrap; gap:.35rem; overflow:visible; padding-bottom:.5rem; }
   :global(.bdvm-management__tabs button) { min-width:0; min-height:3.25rem; height:auto; padding:.5rem .35rem; white-space:normal; text-align:center; display:flex; align-items:center; justify-content:center; }
   :global(.bdvm-management button), :global(.bdvm-dispatch button) { border:1px solid var(--line); border-radius:.2rem; background:var(--coal-800); color:var(--cream); }
   :global(.bdvm-management button:hover), :global(.bdvm-dispatch button:hover) { border-color:var(--amber-500); color:var(--amber-300); }
@@ -169,11 +208,16 @@
     .menu-button { display:block; }
     .brand small,.session-name { display:none; }
     .topbar-title { gap:.65rem; }
-    .activity-status { max-width:38vw; }
+    .activity-status { display:none; }
+    .brand strong { font-size:.85rem; }
+    .topbar { gap:.5rem; }
+    .connection { padding:.35rem; font-size:.6rem; letter-spacing:0; }
+    .reconnect { font-size:.72rem; }
     .workspace { grid-template-columns:1fr; min-height:calc(100vh - 3.75rem); }
-    aside { position:fixed; inset:3.75rem auto 0 0; z-index:15; width:min(17rem,86vw); transform:translateX(-105%); transition:transform .15s ease; }
-    aside.open { transform:translateX(0); }
-    main { padding:1.2rem; }
+    aside { position:fixed; inset:3.75rem auto 0 0; z-index:15; width:min(17rem,86vw); visibility:hidden; transform:translateX(-105%); transition:transform .15s ease; }
+    aside.open { visibility:visible; transform:translateX(0); }
+    .nav-backdrop { display:block; position:fixed; inset:3.75rem 0 0; border:0; background:#0008; z-index:14; }
+    main { padding:.65rem; }
   }
   @media (prefers-reduced-motion:reduce) { aside,nav button { transition:none; } }
 </style>
