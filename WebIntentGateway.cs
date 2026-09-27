@@ -45,15 +45,17 @@ public sealed class WebIntentGateway
     private readonly WebSessionRegistry sessions;
     private readonly SlidingWindowRateLimiter limiter;
     private readonly IAuthoritativeWebIntentExecutor executor;
+    private readonly Action<string, Exception>? onExecutionFailure;
     private readonly Dictionary<string, ReplayEntry> completed = new Dictionary<string, ReplayEntry>(StringComparer.Ordinal);
     private readonly Dictionary<string, ExecutionSlot> executing = new Dictionary<string, ExecutionSlot>(StringComparer.Ordinal);
 
-    public WebIntentGateway(WebModuleHost modules, WebSessionRegistry sessions, IAuthoritativeWebIntentExecutor executor, SlidingWindowRateLimiter? limiter = null)
+    public WebIntentGateway(WebModuleHost modules, WebSessionRegistry sessions, IAuthoritativeWebIntentExecutor executor, SlidingWindowRateLimiter? limiter = null, Action<string, Exception>? onExecutionFailure = null)
     {
         this.modules = modules ?? throw new ArgumentNullException(nameof(modules));
         this.sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
         this.executor = executor ?? throw new ArgumentNullException(nameof(executor));
         this.limiter = limiter ?? new SlidingWindowRateLimiter();
+        this.onExecutionFailure = onExecutionFailure;
     }
 
     public WebIntentResult Submit(WebSessionRequest request, WebIntentEnvelope envelope)
@@ -96,12 +98,20 @@ public sealed class WebIntentGateway
         }
         WebIntentResult result;
         try { result = executor.Execute(session.Principal, envelope) ?? Refused("empty-authoritative-result", envelope.CorrelationId); }
-        catch (Exception) { result = new WebIntentResult { State = WebIntentState.Reconcile, Code = "authoritative-executor-failed", CorrelationId = envelope.CorrelationId }; }
+        catch (Exception exception)
+        {
+            try { onExecutionFailure?.Invoke(envelope.CorrelationId, exception); }
+            catch { /* A diagnostic logger must not alter the command result. */ }
+            result = new WebIntentResult { State = WebIntentState.Reconcile, Code = "authoritative-executor-failed", CorrelationId = envelope.CorrelationId };
+        }
         lock (completed)
         {
             executing.Remove(replayKey);
             slot.Result = Copy(result, false);
-            if (result.State != WebIntentState.Pending) completed[replayKey] = new ReplayEntry(fingerprint, Copy(result, false));
+            // Executor failures are not terminal receipts. Keep the exact envelope retryable;
+            // the authoritative command layer reconciles its stable correlation/operation ID.
+            if (result.State != WebIntentState.Pending && result.Code != "authoritative-executor-failed")
+                completed[replayKey] = new ReplayEntry(fingerprint, Copy(result, false));
             slot.Completed.Set();
         }
         return result;
